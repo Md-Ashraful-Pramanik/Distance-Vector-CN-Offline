@@ -1,4 +1,6 @@
 import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 
 //Done!
 public class IPAddress implements Serializable {
@@ -29,4 +31,16 @@ public class IPAddress implements Serializable {
     @Override
     public String toString() { return string; }
 
+    @Override
+    public boolean equals(Object obj) {
+        if(!(obj instanceof IPAddress))
+            return false;
+
+        return ((IPAddress)obj).string.equals(string);
+    }
+
+    @Override
+    public int hashCode() {
+        return string.hashCode();
+    }
 }

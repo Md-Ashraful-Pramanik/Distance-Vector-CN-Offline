@@ -1,5 +1,3 @@
-import sun.nio.cs.ext.MacArabic;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,14 +11,14 @@ import java.util.logging.Logger;
 public class NetworkLayerServer {
 
     static int clientCount = 0;
-    static ArrayList<Router> routers = new ArrayList<>();
+    static Vector<Router> routers = new Vector<>();
     static RouterStateChanger stateChanger = null;
-    static Map<IPAddress,Integer> clientInterfaces = new HashMap<>(); //Each map entry represents number of client end devices connected to the interface
-    static Map<IPAddress, EndDevice> endDeviceMap = new HashMap<>();
-    static ArrayList<EndDevice> endDevices = new ArrayList<>();
-    static Map<Integer, Integer> deviceIDtoRouterID = new HashMap<>();
-    static Map<IPAddress, Integer> interfacetoRouterID = new HashMap<>();
-    static Map<Integer, Router> routerMap = new HashMap<>();
+    static HashMap<IPAddress,Integer> clientInterfaces = new HashMap<>(); //Each map entry represents number of client end devices connected to the interface
+    static HashMap<IPAddress, EndDevice> endDeviceMap = new HashMap<>();
+    static Vector<EndDevice> endDevices = new Vector<>();
+    static HashMap<Integer, Integer> deviceIDtoRouterID = new HashMap<>();
+    static HashMap<IPAddress, Integer> interfacetoRouterID = new HashMap<>();
+    static HashMap<Integer, Router> routerMap = new HashMap<>();
 
     public static void main(String[] args) {
 
@@ -37,7 +35,7 @@ public class NetworkLayerServer {
         System.out.println("Creating router topology");
 
         readTopology();
-        printRouters();
+        //printRouters();
 
         initRoutingTables(); //Initialize routing tables for all routers
 
@@ -53,8 +51,9 @@ public class NetworkLayerServer {
                 clientCount++;
                 endDevices.add(endDevice);
                 endDeviceMap.put(endDevice.getIpAddress(),endDevice);
+                //System.out.println(endDeviceMap.containsKey(new IPAddress(endDevice.getIpAddress().getString())));
                 new ServerThread(new NetworkUtility(socket), endDevice);
-            } catch (IOException ex) {
+            } catch (Exception ex) {
                 Logger.getLogger(NetworkLayerServer.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
@@ -67,28 +66,40 @@ public class NetworkLayerServer {
     }
 
     public static synchronized void DVR(int startingRouterId) {
-        /**
-         * pseudocode
-         */
+        boolean convergence = false;
+        boolean firstTimeFlag = true;
 
-        /*
-        while(convergence)
+        while(!convergence)
         {
-            //convergence means no change in any routingTable before and after executing the following for loop
-            for each router r <starting from the router with routerId = startingRouterId, in any order>
-            {
-                1. T <- getRoutingTable of the router r
-                2. N <- find routers which are the active neighbors of the current router r
-                3. Update routingTable of each router t in N using the
-                   routing table of r [Hint: Use t.updateRoutingTable(r)]
+            convergence = true;
+            for (Router r: routers) {
+                if(firstTimeFlag && r.getRouterId() != startingRouterId)
+                    continue;
+                for (int neighbourID: r.getNeighborRouterIDs()){
+                    Router t = routerMap.get(neighbourID);
+                    if(t.getState() && t.sfupdateRoutingTable(r))
+                        convergence = false;
+                }
+            }
+            if (firstTimeFlag){
+                convergence = false;
+                firstTimeFlag = false;
             }
         }
-        */
     }
 
     public static synchronized void simpleDVR(int startingRouterId) {
+        boolean convergence = false;
 
+        routerMap.get(startingRouterId).updateRoutingTable();
 
+        while(!convergence)
+        {
+            convergence = true;
+            for (Router r: routers)
+                if(r.getState() && r.updateRoutingTable())
+                    convergence = false;
+        }
     }
 
     public static EndDevice getClientDeviceSetup() {
@@ -150,9 +161,9 @@ public class NetworkLayerServer {
             while(inputFile.hasNext()) {
                 inputFile.nextLine();
                 int routerId;
-                ArrayList<Integer> neighborRouters = new ArrayList<>();
-                ArrayList<IPAddress> interfaceAddrs = new ArrayList<>();
-                Map<Integer, IPAddress> interfaceIDtoIP = new HashMap<>();
+                Vector<Integer> neighborRouters = new Vector<>();
+                Vector<IPAddress> interfaceAddrs = new Vector<>();
+                HashMap<Integer, IPAddress> interfaceIDtoIP = new HashMap<>();
 
                 routerId = inputFile.nextInt();
 
@@ -189,6 +200,10 @@ public class NetworkLayerServer {
         } catch (FileNotFoundException ex) {
             Logger.getLogger(NetworkLayerServer.class.getName()).log(Level.SEVERE, null, ex);
         }
+    }
+
+    public static Router getRouterByID(int id){
+        return routers.get(id - 1);
     }
 
 }

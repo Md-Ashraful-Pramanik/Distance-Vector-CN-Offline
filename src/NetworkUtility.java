@@ -12,8 +12,6 @@ public class NetworkUtility {
     private ObjectInputStream objectInputStream;
     private ObjectOutputStream objectOutputStream;
 
-
-
     public void print(){
         System.out.println(socket.getLocalAddress().toString());
         System.out.println(socket.getInetAddress().toString());
@@ -52,11 +50,11 @@ public class NetworkUtility {
         try {
             object = objectInputStream.readObject();
         } catch (SocketTimeoutException e) {
-            return "Timed out haha";
+            //return "Timed out haha";
         }catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
         return object;
     }
@@ -64,8 +62,9 @@ public class NetworkUtility {
     public void write(Object object){
         try {
             objectOutputStream.writeObject(object);
+            objectOutputStream.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 

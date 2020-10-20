@@ -1,21 +1,19 @@
 //Work needed
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.util.zip.CheckedOutputStream;
 
 public class Router {
     private int routerId;
     private int numberOfInterfaces;
-    private ArrayList<IPAddress> interfaceAddresses;//list of IP address of all interfaces of the router
-    private ArrayList<RoutingTableEntry> routingTable;//used to implement DVR
-    private ArrayList<Integer> neighborRouterIDs;//Contains both "UP" and "DOWN" state routers
+    private Vector<IPAddress> interfaceAddresses;//list of IP address of all interfaces of the router
+    private Vector<RoutingTableEntry> routingTable;//used to implement DVR
+    private Vector<Integer> neighborRouterIDs;//Contains both "UP" and "DOWN" state routers
     private Boolean state;//true represents "UP" state and false is for "DOWN" state
     private Map<Integer, IPAddress> gatewayIDtoIP;
     public Router() {
-        interfaceAddresses = new ArrayList<>();
-        routingTable = new ArrayList<>();
-        neighborRouterIDs = new ArrayList<>();
+        interfaceAddresses = new Vector<>();
+        routingTable = new Vector<>();
+        neighborRouterIDs = new Vector<>();
 
         /**
          * 80% Probability that the router is up
@@ -28,14 +26,14 @@ public class Router {
         numberOfInterfaces = 0;
     }
 
-    public Router(int routerId, ArrayList<Integer> neighborRouters, ArrayList<IPAddress> interfaceAddresses, Map<Integer, IPAddress> gatewayIDtoIP) {
+    public Router(int routerId, Vector<Integer> neighborRouters,
+                  Vector<IPAddress> interfaceAddresses,
+                  HashMap<Integer, IPAddress> gatewayIDtoIP) {
         this.routerId = routerId;
         this.interfaceAddresses = interfaceAddresses;
         this.neighborRouterIDs = neighborRouters;
         this.gatewayIDtoIP = gatewayIDtoIP;
-        routingTable = new ArrayList<>();
-
-
+        this.routingTable = new Vector<>();
 
         /**
          * 80% Probability that the router is up
@@ -69,27 +67,69 @@ public class Router {
      * for itself, distance=0; for any connected router with state=true, distance=1; otherwise distance=Constants.INFTY;
      */
     public void initiateRoutingTable() {
-
-        
+        for (Router r: NetworkLayerServer.routers) {
+            if(r.getRouterId() == routerId)
+                routingTable.add(new RoutingTableEntry(r.getRouterId(), 0, r.getRouterId()));
+            else if(neighborRouterIDs.contains(r.getRouterId())){
+                if(r.state)
+                    routingTable.add(new RoutingTableEntry(r.getRouterId(), 1, r.getRouterId()));
+                else
+                    routingTable.add(new RoutingTableEntry(r.getRouterId(), Constants.INFINITY, r.getRouterId()));
+            }
+            else
+                addRoutingTableEntry(new RoutingTableEntry(r.getRouterId(), Constants.INFINITY, -1));
+        }
     }
 
     /**
      * Delete all the routingTableEntry
      */
     public void clearRoutingTable() {
-
+        routingTable.clear();
     }
 
     /**
      * Update the routing table for this router using the entries of Router neighbor
-     * @param neighbor
      */
-    public boolean updateRoutingTable(Router neighbor) {
-        
+    public boolean updateRoutingTable() {
+        boolean change = false;
+        if(routingTable.size() == 0)
+            initiateRoutingTable();
+
+        for (int i=0; i< NetworkLayerServer.routers.size(); i++) {
+            RoutingTableEntry ownEntry = routingTable.get(i);
+            if(ownEntry.getDistance() <= 1)
+                continue;
+
+            RoutingTableEntry tempEntry = new RoutingTableEntry(ownEntry.getRouterId(), Constants.INFINITY, -1);
+            for (int neighbourRouterID:neighborRouterIDs) {
+                Router neighbourRouter = NetworkLayerServer.getRouterByID(neighbourRouterID);
+                if(neighbourRouter.getRoutingTable().size() == 0)
+                    continue;
+
+                RoutingTableEntry neighbourEntry = neighbourRouter.getRoutingTable().get(i);
+
+                if (neighbourEntry.getDistance() + 1 < Constants.INFINITY &&
+                        neighbourEntry.getDistance() + 1 < tempEntry.getDistance())
+                {
+                    tempEntry.setDistance(neighbourEntry.getDistance() + 1);
+                    tempEntry.setGatewayRouterId(neighbourRouterID);
+                }
+            }
+
+            if(ownEntry.getDistance() != tempEntry.getDistance() ||
+                    ownEntry.getGatewayRouterId() != tempEntry.getGatewayRouterId()){
+                ownEntry.setDistance(tempEntry.getDistance());
+                ownEntry.setGatewayRouterId(tempEntry.getGatewayRouterId());
+                change = true;
+            }
+        }
+
+        return change;
     }
 
     public boolean sfupdateRoutingTable(Router neighbor) {
-        
+        return false;
     }
 
     /**
@@ -117,16 +157,16 @@ public class Router {
         this.numberOfInterfaces = numberOfInterfaces;
     }
 
-    public ArrayList<IPAddress> getInterfaceAddresses() {
+    public Vector<IPAddress> getInterfaceAddresses() {
         return interfaceAddresses;
     }
 
-    public void setInterfaceAddresses(ArrayList<IPAddress> interfaceAddresses) {
+    public void setInterfaceAddresses(Vector<IPAddress> interfaceAddresses) {
         this.interfaceAddresses = interfaceAddresses;
         numberOfInterfaces = interfaceAddresses.size();
     }
 
-    public ArrayList<RoutingTableEntry> getRoutingTable() {
+    public Vector<RoutingTableEntry> getRoutingTable() {
         return routingTable;
     }
 
@@ -134,11 +174,11 @@ public class Router {
         this.routingTable.add(entry);
     }
 
-    public ArrayList<Integer> getNeighborRouterIDs() {
+    public Vector<Integer> getNeighborRouterIDs() {
         return neighborRouterIDs;
     }
 
-    public void setNeighborRouterIDs(ArrayList<Integer> neighborRouterIDs) { this.neighborRouterIDs = neighborRouterIDs; }
+    public void setNeighborRouterIDs(Vector<Integer> neighborRouterIDs) { this.neighborRouterIDs = neighborRouterIDs; }
 
     public Boolean getState() {
         return state;
@@ -146,6 +186,10 @@ public class Router {
 
     public void setState(Boolean state) {
         this.state = state;
+    }
+
+    public RoutingTableEntry getRoutingEntryForRouterID(int id){
+        return routingTable.get(id - 1);
     }
 
     public Map<Integer, IPAddress> getGatewayIDtoIP() { return gatewayIDtoIP; }
