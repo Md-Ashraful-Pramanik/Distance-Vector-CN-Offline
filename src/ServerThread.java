@@ -18,6 +18,7 @@ public class ServerThread implements Runnable {
 
     @Override
     public void run() {
+        /*
 //        if (getActiveClientIPs().size() <= 1) {
 //            try {
 //                wait();
@@ -28,30 +29,32 @@ public class ServerThread implements Runnable {
 //            }
 //        }
 
-        /*
+
         Tasks:
         1. Upon receiving a packet and recipient, call deliverPacket(packet)
         2. If the packet contains "SHOW_ROUTE" request, then fetch the required information
                 and send back to client
         3. Either send acknowledgement with number of hops or send failure message back to client
         */
-
         networkUtility.write(endDevice); /// sending endDevice configuration
 
+        String msg = (String) networkUtility.read();
+        if(msg == null || !msg.equals(Constants.SEND_ACTIVE_CLIENT))
+            return;
+
+        HashSet<IPAddress> activeClientIPs = getActiveClientIPs();
+        networkUtility.write(activeClientIPs);
+
         for(int i=0;i<100;i++) {
-            HashSet<IPAddress> activeClientIPs = getActiveClientIPs();
-            networkUtility.write(activeClientIPs);
-
-            if(activeClientIPs.size() <= 1){
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                System.out.println("Sending packet again");
-                continue;
-            }
-
+//            if(activeClientIPs.size() <= 1){
+//                try {
+//                    Thread.sleep(5000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//                System.out.println("Sending packet again");
+//                continue;
+//            }
             Object obj = networkUtility.read();
             if(obj == null) {
                 freeClientResourse();
@@ -62,29 +65,52 @@ public class ServerThread implements Runnable {
 
             if (!deliverPacket(packet)) {
                 packet.hopcount = Constants.INFINITY;
-                packet.setMessage("Dropped");
+                packet.setSpecialMessage(Constants.DROP_MESSAGE);
                 networkUtility.write(packet);
                 continue;
             }
 
             packet.hopcount = route.size();
             packet.setMessage("acknowledgement");
-            networkUtility.write(packet);
 
-            if(packet.getSpecialMessage().equals("SHOW_ROUTE")) {
-                try {
-                    Thread.sleep(200);
-                    networkUtility.write(route);
-                    Thread.sleep(200);
-                }catch (Exception ex){
-                    System.out.println("Can not sleep.");
-                    return;
+            if(packet.getSpecialMessage().equals(Constants.SHOW_ROUTE)) {
+                System.out.println("**************Sending route to : " + endDevice.getDeviceID());
+                if (route != null || route.size() != 0) {
+                    System.out.println("Route length " + route.size());
+                    System.out.println("Route");
+                    for (Router r: route) {
+                        System.out.print(r.getRouterId() + " -> ");
+                    }
+                    System.out.println();
                 }
+                else
+                    System.out.println("No route finds");
+
+                networkUtility.write(getRoutePath());
+                if(Constants.REQUEST_ROUTING_TABLE.equals(networkUtility.read()))
+                    networkUtility.write(getRouteTables());
             }
+            else
+                networkUtility.write(packet);
         }
 
         freeClientResourse(); /// Deleting this client from every list and updating client
+    }
 
+    private Vector<Integer> getRoutePath(){
+        Vector<Integer> routingPath = new Vector<>(route.size());
+        for (Router r: route)
+            routingPath.add(r.getRouterId());
+
+        return routingPath;
+    }
+
+    private Vector<Vector<RoutingTableEntry>> getRouteTables(){
+        Vector<Vector<RoutingTableEntry>> routingTables = new Vector<>(route.size());
+        for (Router r: route)
+            routingTables.add(r.getRoutingTable());
+
+        return routingTables;
     }
 
     private void freeClientResourse() {
@@ -177,7 +203,7 @@ public class ServerThread implements Runnable {
 //            if(r.getState())
 //                activeClients.addAll(r.getInterfaceAddresses());
 //        }
-        System.out.println("Sending " + endDevice.getDeviceID() + " => " + (activeClients.size() -1) + " Client");
+        //System.out.println("Sending " + endDevice.getDeviceID() + " => " + (activeClients.size() -1) + " Client");
         return activeClients;
     }
 

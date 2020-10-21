@@ -1,5 +1,7 @@
+import java.io.Serializable;
+
 //Done!
-public class RoutingTableEntry {
+public class RoutingTableEntry implements Serializable {
 
     private int routerId;
     private double distance;

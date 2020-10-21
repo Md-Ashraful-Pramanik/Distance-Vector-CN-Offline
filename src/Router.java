@@ -1,15 +1,15 @@
 //Work needed
+import java.io.Serializable;
 import java.util.*;
-import java.util.zip.CheckedOutputStream;
 
-public class Router {
+public class Router implements Serializable {
     private int routerId;
     private int numberOfInterfaces;
     private Vector<IPAddress> interfaceAddresses;//list of IP address of all interfaces of the router
     private Vector<RoutingTableEntry> routingTable;//used to implement DVR
     private Vector<Integer> neighborRouterIDs;//Contains both "UP" and "DOWN" state routers
     private Boolean state;//true represents "UP" state and false is for "DOWN" state
-    private Map<Integer, IPAddress> gatewayIDtoIP;
+    private HashMap<Integer, IPAddress> gatewayIDtoIP;
     public Router() {
         interfaceAddresses = new Vector<>();
         routingTable = new Vector<>();
