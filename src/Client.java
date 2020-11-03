@@ -61,7 +61,7 @@ public class Client {
             IPAddress destinationAddress = getRandomClientIP();
             packet = new Packet("Hello "+i, "", deviceIP, destinationAddress);
 
-            if(i % 20 == 0) {
+            if(i == 20) {
                 //System.out.println("Asking for showing route");
                 packet.setSpecialMessage(Constants.SHOW_ROUTE);
             }
@@ -80,16 +80,18 @@ public class Client {
             else if(i % 20 == 0) {
                 //System.out.println("Other");
                 Vector<Integer> routePath = (Vector<Integer>) obj;
-                if(routePath.size() == 0) {
+                if(routePath == null || routePath.size() == 0) {
                     System.out.println("No Route finds.");
                     continue;
                 }
 
-                System.out.println("Routing Path: ");
+                hopCount+=routePath.size()-1;
+
+                System.out.print("Routing Path: ");
                 for (int j=0;j<routePath.size()-1;j++)
                     System.out.print(routePath.get(j) + " -> ");
                 System.out.println(routePath.get(routePath.size()-1));
-                System.out.println("HopCount: " + routePath.size());
+                System.out.println("HopCount: " + (routePath.size()-1));
 
                 packet = new Packet("", Constants.REQUEST_ROUTING_TABLE, null, null);
                 System.out.println(packet.getSpecialMessage());
@@ -111,7 +113,7 @@ public class Client {
         System.out.println("------------------------------------------");
         System.out.println("Total packet sent: " + (dropCount + successCount));
         System.out.println("Average hop count: " + ((double)hopCount) / (dropCount + successCount));
-        System.out.println("Average drop count: " + ((double)dropCount) / (dropCount + successCount));
+        System.out.println("Average drop count: " + ((double)dropCount) / (dropCount + successCount) * 100);
 
         networkUtility.closeConnection();
     }

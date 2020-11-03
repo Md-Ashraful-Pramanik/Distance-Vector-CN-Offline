@@ -66,6 +66,8 @@ public class Router implements Serializable {
      * for itself, distance=0; for any connected router with state=true, distance=1; otherwise distance=Constants.INFTY;
      */
     public void initiateRoutingTable() {
+        if (routingTable.size() > 0)
+            clearRoutingTable();
         for (Router r: NetworkLayerServer.routers) {
             if(r.getRouterId() == routerId)
                 routingTable.add(new RoutingTableEntry(r.getRouterId(), 0, r.getRouterId()));
@@ -92,7 +94,7 @@ public class Router implements Serializable {
      */
     public boolean updateRoutingTable(Router neighbour) {
         boolean change = false;
-        if(routingTable.size() == 0)
+        if(routingTable.size() == 0 || neighbour.routingTable.size() == 0)
             initiateRoutingTable();
 
 //        for (int i=0; i< NetworkLayerServer.routers.size(); i++) {
@@ -126,6 +128,8 @@ public class Router implements Serializable {
         for (int i=0;i<routingTable.size();i++) {
             if(routingTable.get(i).getDistance()<=1)
                 continue;
+            if(neighbour.routingTable.size() <= i)
+                continue;
             if(neighbour.routingTable.get(i).getDistance() == Constants.INFINITY)
                 continue;
 
@@ -141,11 +145,13 @@ public class Router implements Serializable {
 
     public boolean sfupdateRoutingTable(Router neighbour) {
         boolean change = false;
-        if(routingTable.size() == 0)
+        if(routingTable.size() == 0 || neighbour.routingTable.size() == 0)
             initiateRoutingTable();
 
         for (int i=0;i<routingTable.size();i++) {
             if(routingTable.get(i).getDistance()<=1)
+                continue;
+            if(neighbour.routingTable.size() <= i)
                 continue;
             if(neighbour.routingTable.get(i).getDistance() == Constants.INFINITY)
                 continue;

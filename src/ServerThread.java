@@ -52,7 +52,7 @@ public class ServerThread implements Runnable {
                 continue;
             }
 
-            packet.hopcount = route.size();
+            packet.hopcount = route.size() - 1;
             packet.setMessage("acknowledgement");
 
             if(packet.getSpecialMessage().equals(Constants.SHOW_ROUTE)) {
@@ -74,7 +74,7 @@ public class ServerThread implements Runnable {
                     //System.out.println("request " + ((Packet)obj2).getSpecialMessage());
                     if(Constants.REQUEST_ROUTING_TABLE.equals(((Packet)obj2).getSpecialMessage())) {
                         networkUtility.write(getRouteTables());
-                        System.out.println("Send routing table of all router.");
+                        //System.out.println("Send routing table of all router.");
                     }
                 }
 
@@ -159,11 +159,15 @@ public class ServerThread implements Runnable {
                 routingEntry.setDistance(Constants.INFINITY);
                 routingEntry.setGatewayRouterId(-1);
                 RouterStateChanger.islocked = true;
-                NetworkLayerServer.DVR(sourceRouter.getRouterId());
+                NetworkLayerServer.simpleDVR(sourceRouter.getRouterId());
                 RouterStateChanger.islocked = false;
                 try {
-                    RouterStateChanger.msg.notify();
-                }catch (Exception ex){}
+                    synchronized (RouterStateChanger.msg){
+                        RouterStateChanger.msg.notify();
+                    }
+                }catch (Exception ex){
+                    System.out.println("Can not wake up state changer.");
+                }
                 finally {
                     return false;
                 }
@@ -172,14 +176,27 @@ public class ServerThread implements Runnable {
                 nextRouter.getRoutingEntryForRouterID(sourceRouter.getRouterId()).setDistance(1);
                 nextRouter.getRoutingEntryForRouterID(sourceRouter.getRouterId()).setGatewayRouterId(sourceRouter.getRouterId());
                 RouterStateChanger.islocked = true;
-                NetworkLayerServer.DVR(nextRouter.getRouterId());
+                NetworkLayerServer.simpleDVR(nextRouter.getRouterId());
                 RouterStateChanger.islocked = false;
                 try {
-                    RouterStateChanger.msg.notify();
-                }catch (Exception ex){}
+                    synchronized (RouterStateChanger.msg){
+                        RouterStateChanger.msg.notify();
+                    }
+                }catch (Exception ex)
+                {
+                    System.out.println("Can not wake up state changer.");
+                }
             }
             sourceRouter = nextRouter;
             route.add(sourceRouter);
+            if(route.size()>NetworkLayerServer.routers.size()){
+//                System.out.println("Fall on a loop.");
+//                for (Router r:route) {
+//                    r.printRoutingTable();
+//                }
+//                System.exit(1);
+                return false;
+            }
         }
 
         return true;
