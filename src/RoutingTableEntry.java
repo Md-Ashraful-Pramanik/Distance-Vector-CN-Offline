@@ -37,4 +37,8 @@ public class RoutingTableEntry implements Serializable {
         this.gatewayRouterId = gatewayRouterId;
     }
 
+    @Override
+    public String toString() {
+        return getRouterId() + " " + getDistance() + " " + getGatewayRouterId();
+    }
 }

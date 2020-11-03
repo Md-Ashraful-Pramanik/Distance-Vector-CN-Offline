@@ -47,26 +47,23 @@ public class Client {
 
         System.out.print("Press Y to start sending packet: ");
         scanner.next();
+        Packet packet;
 
-        networkUtility.write(Constants.SEND_ACTIVE_CLIENT);
+        packet = new Packet("", Constants.SEND_ACTIVE_CLIENT, deviceIP, null);
+        networkUtility.write(packet);
+
         HashSet<IPAddress> endDeviceSet = (HashSet<IPAddress>) networkUtility.read();
         endDeviceSet.remove(deviceIP); /// Removing it's own entry.
         endDeviceIPs = new IPAddress[endDeviceSet.size()];
         endDeviceSet.toArray(endDeviceIPs);
 
-        //System.out.println(endDeviceIPs.length);
-        //            if(destinationAddress == null){
-//                Thread.sleep(5000);
-//                System.out.println("Awaking from sleep.");
-//                continue;
-//            }
-        for(int i=0;i<100;i++) {
+        for(int i=0;i<Constants.NO_OF_EXP;i++) {
             IPAddress destinationAddress = getRandomClientIP();
-            Packet packet = new Packet("HI", "", deviceIP, destinationAddress);
+            packet = new Packet("Hello "+i, "", deviceIP, destinationAddress);
 
             if(i % 20 == 0) {
                 //System.out.println("Asking for showing route");
-                packet.setSpecialMessage("SHOW_ROUTE");
+                packet.setSpecialMessage(Constants.SHOW_ROUTE);
             }
 
             networkUtility.write(packet);
@@ -75,11 +72,10 @@ public class Client {
             if(obj instanceof Packet) {
                 Packet ack = (Packet) obj;
                 hopCount += ack.hopcount;
-                if (ack.getSpecialMessage().equals(Constants.DROP_MESSAGE)) {
+                if (ack.getSpecialMessage().equals(Constants.DROP_MESSAGE))
                     dropCount++;
-                } else {
+                else
                     successCount++;
-                }
             }
             else if(i % 20 == 0) {
                 //System.out.println("Other");
@@ -89,20 +85,35 @@ public class Client {
                     continue;
                 }
 
-                System.out.println("Route");
-                for (int r: routePath) {
-                    System.out.print(r + " -> ");
-                }
-                System.out.println();
-                networkUtility.write(Constants.REQUEST_ROUTING_TABLE);
+                System.out.println("Routing Path: ");
+                for (int j=0;j<routePath.size()-1;j++)
+                    System.out.print(routePath.get(j) + " -> ");
+                System.out.println(routePath.get(routePath.size()-1));
+                System.out.println("HopCount: " + routePath.size());
+
+                packet = new Packet("", Constants.REQUEST_ROUTING_TABLE, null, null);
+                System.out.println(packet.getSpecialMessage());
+                networkUtility.write(packet);
                 Vector<Vector<RoutingTableEntry>> routingTables = (Vector<Vector<RoutingTableEntry>>)networkUtility.read();
                 successCount++;
+
+                for (int j=0;j<routingTables.size();j++) {
+                    System.out.println("Routing path for router " + routePath.get(j));
+                    for (RoutingTableEntry entry:routingTables.get(j)) {
+                        System.out.println(entry);
+                    }
+                    System.out.println();
+                }
+                System.out.println("\n");
             }
         }
 
+        System.out.println("------------------------------------------");
         System.out.println("Total packet sent: " + (dropCount + successCount));
         System.out.println("Average hop count: " + ((double)hopCount) / (dropCount + successCount));
         System.out.println("Average drop count: " + ((double)dropCount) / (dropCount + successCount));
+
+        networkUtility.closeConnection();
     }
 
     public static IPAddress getRandomClientIP(){

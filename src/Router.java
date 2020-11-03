@@ -10,6 +10,7 @@ public class Router implements Serializable {
     private Vector<Integer> neighborRouterIDs;//Contains both "UP" and "DOWN" state routers
     private Boolean state;//true represents "UP" state and false is for "DOWN" state
     private HashMap<Integer, IPAddress> gatewayIDtoIP;
+
     public Router() {
         interfaceAddresses = new Vector<>();
         routingTable = new Vector<>();
@@ -60,8 +61,6 @@ public class Router implements Serializable {
         return string;
     }
 
-
-
     /**
      * Initialize the distance(hop count) for each router.
      * for itself, distance=0; for any connected router with state=true, distance=1; otherwise distance=Constants.INFTY;
@@ -77,7 +76,7 @@ public class Router implements Serializable {
                     routingTable.add(new RoutingTableEntry(r.getRouterId(), Constants.INFINITY, r.getRouterId()));
             }
             else
-                addRoutingTableEntry(new RoutingTableEntry(r.getRouterId(), Constants.INFINITY, -1));
+                routingTable.add(new RoutingTableEntry(r.getRouterId(), Constants.INFINITY, -1));
         }
     }
 
@@ -91,36 +90,48 @@ public class Router implements Serializable {
     /**
      * Update the routing table for this router using the entries of Router neighbor
      */
-    public boolean updateRoutingTable() {
+    public boolean updateRoutingTable(Router neighbour) {
         boolean change = false;
         if(routingTable.size() == 0)
             initiateRoutingTable();
 
-        for (int i=0; i< NetworkLayerServer.routers.size(); i++) {
-            RoutingTableEntry ownEntry = routingTable.get(i);
-            if(ownEntry.getDistance() <= 1)
+//        for (int i=0; i< NetworkLayerServer.routers.size(); i++) {
+//            RoutingTableEntry ownEntry = routingTable.get(i);
+//            if(ownEntry.getDistance() <= 1)
+//                continue;
+//
+//            RoutingTableEntry tempEntry = new RoutingTableEntry(ownEntry.getRouterId(), Constants.INFINITY, -1);
+//            for (int neighbourRouterID:neighborRouterIDs) {
+//                Router neighbourRouter = NetworkLayerServer.getRouterByID(neighbourRouterID);
+//                if(neighbourRouter.getRoutingTable().size() == 0)
+//                    continue;
+//
+//                RoutingTableEntry neighbourEntry = neighbourRouter.getRoutingTable().get(i);
+//
+//                if (neighbourEntry.getDistance() + 1 < Constants.INFINITY &&
+//                        neighbourEntry.getDistance() + 1 < tempEntry.getDistance())
+//                {
+//                    tempEntry.setDistance(neighbourEntry.getDistance() + 1);
+//                    tempEntry.setGatewayRouterId(neighbourRouterID);
+//                }
+//            }
+//
+//            if(ownEntry.getDistance() != tempEntry.getDistance() ||
+//                    ownEntry.getGatewayRouterId() != tempEntry.getGatewayRouterId()){
+//                ownEntry.setDistance(tempEntry.getDistance());
+//                ownEntry.setGatewayRouterId(tempEntry.getGatewayRouterId());
+//                change = true;
+//            }
+//        }
+        for (int i=0;i<routingTable.size();i++) {
+            if(routingTable.get(i).getDistance()<=1)
+                continue;
+            if(neighbour.routingTable.get(i).getDistance() == Constants.INFINITY)
                 continue;
 
-            RoutingTableEntry tempEntry = new RoutingTableEntry(ownEntry.getRouterId(), Constants.INFINITY, -1);
-            for (int neighbourRouterID:neighborRouterIDs) {
-                Router neighbourRouter = NetworkLayerServer.getRouterByID(neighbourRouterID);
-                if(neighbourRouter.getRoutingTable().size() == 0)
-                    continue;
-
-                RoutingTableEntry neighbourEntry = neighbourRouter.getRoutingTable().get(i);
-
-                if (neighbourEntry.getDistance() + 1 < Constants.INFINITY &&
-                        neighbourEntry.getDistance() + 1 < tempEntry.getDistance())
-                {
-                    tempEntry.setDistance(neighbourEntry.getDistance() + 1);
-                    tempEntry.setGatewayRouterId(neighbourRouterID);
-                }
-            }
-
-            if(ownEntry.getDistance() != tempEntry.getDistance() ||
-                    ownEntry.getGatewayRouterId() != tempEntry.getGatewayRouterId()){
-                ownEntry.setDistance(tempEntry.getDistance());
-                ownEntry.setGatewayRouterId(tempEntry.getGatewayRouterId());
+            if(routingTable.get(i).getDistance() > neighbour.routingTable.get(i).getDistance() + 1){
+                routingTable.get(i).setDistance(neighbour.routingTable.get(i).getDistance() + 1);
+                routingTable.get(i).setGatewayRouterId(neighbour.getRouterId());
                 change = true;
             }
         }
@@ -128,8 +139,38 @@ public class Router implements Serializable {
         return change;
     }
 
-    public boolean sfupdateRoutingTable(Router neighbor) {
-        return false;
+    public boolean sfupdateRoutingTable(Router neighbour) {
+        boolean change = false;
+        if(routingTable.size() == 0)
+            initiateRoutingTable();
+
+        for (int i=0;i<routingTable.size();i++) {
+            if(routingTable.get(i).getDistance()<=1)
+                continue;
+            if(neighbour.routingTable.get(i).getDistance() == Constants.INFINITY)
+                continue;
+
+            /// Split horizon rule
+            if(neighbour.routingTable.get(i).getGatewayRouterId() == routerId)
+                continue;
+
+            /// force update
+            if(routingTable.get(i).getGatewayRouterId() == neighbour.getRouterId()) {
+                if(routingTable.get(i).getDistance() != neighbour.routingTable.get(i).getDistance() + 1) {
+                    routingTable.get(i).setDistance(neighbour.routingTable.get(i).getDistance() + 1);
+                    change = true;
+                }
+                continue;
+            }
+
+            if(routingTable.get(i).getDistance() > neighbour.routingTable.get(i).getDistance() + 1){
+                routingTable.get(i).setDistance(neighbour.routingTable.get(i).getDistance() + 1);
+                routingTable.get(i).setGatewayRouterId(neighbour.getRouterId());
+                change = true;
+            }
+        }
+
+        return change;
     }
 
     /**
@@ -202,6 +243,7 @@ public class Router implements Serializable {
         }
         System.out.println("-----------------------");
     }
+
     public String strRoutingTable() {
         String string = "Router" + routerId + "\n";
         string += "DestID Distance Nexthop\n";

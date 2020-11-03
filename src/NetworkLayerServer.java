@@ -39,11 +39,14 @@ public class NetworkLayerServer {
 
         initRoutingTables(); //Initialize routing tables for all routers
 
-        //DVR(1); //Update routing table using distance vector routing until convergence
-        simpleDVR(1);
+        DVR(1); //Update routing table using distance vector routing until convergence
+        //simpleDVR(1);
+        //printRouters();
         stateChanger = new RouterStateChanger();//Starts a new thread which turns on/off routers randomly depending on parameter Constants.LAMBDA
 
-        while(true) {
+        System.out.println("Starting taking client");
+
+        while (true) {
             try {
                 Socket socket = serverSocket.accept();
                 System.out.println("Client" + (clientCount + 1) + " attempted to connect");
@@ -67,38 +70,55 @@ public class NetworkLayerServer {
 
     public static synchronized void DVR(int startingRouterId) {
         boolean convergence = false;
-        boolean firstTimeFlag = true;
+        boolean firstTime = true;
+
+        Router t;
 
         while(!convergence)
         {
             convergence = true;
             for (Router r: routers) {
-                if(firstTimeFlag && r.getRouterId() != startingRouterId)
+                if(!r.getState())
                     continue;
-                for (int neighbourID: r.getNeighborRouterIDs()){
-                    Router t = routerMap.get(neighbourID);
-                    if(t.getState() && t.sfupdateRoutingTable(r))
+                if(firstTime && r.getRouterId()!=startingRouterId)
+                    continue;
+                for (int neighbourID : r.getNeighborRouterIDs()) {
+                    t = getRouterByID(neighbourID);
+                    if (t.getState() && r.sfupdateRoutingTable(t))
                         convergence = false;
                 }
             }
-            if (firstTimeFlag){
+            if(firstTime){
                 convergence = false;
-                firstTimeFlag = false;
+                firstTime = false;
             }
         }
     }
 
     public static synchronized void simpleDVR(int startingRouterId) {
         boolean convergence = false;
+        boolean firstTime = true;
 
-        routerMap.get(startingRouterId).updateRoutingTable();
+        Router t;
 
         while(!convergence)
         {
             convergence = true;
-            for (Router r: routers)
-                if(r.getState() && r.updateRoutingTable())
-                    convergence = false;
+            for (Router r: routers) {
+                if(!r.getState())
+                    continue;
+                if(firstTime && r.getRouterId()!=startingRouterId)
+                    continue;
+                for (int neighbourID : r.getNeighborRouterIDs()) {
+                    t = getRouterByID(neighbourID);
+                    if (t.getState() && r.updateRoutingTable(t))
+                        convergence = false;
+                }
+            }
+            if(firstTime){
+                convergence = false;
+                firstTime = false;
+            }
         }
     }
 
@@ -203,7 +223,7 @@ public class NetworkLayerServer {
     }
 
     public static Router getRouterByID(int id){
-        return routers.get(id - 1);
+        return routerMap.get(id);
     }
 
 }

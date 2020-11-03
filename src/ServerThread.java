@@ -19,17 +19,6 @@ public class ServerThread implements Runnable {
     @Override
     public void run() {
         /*
-//        if (getActiveClientIPs().size() <= 1) {
-//            try {
-//                wait();
-//                networkUtility.write(getActiveClientIPs());
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//                return;
-//            }
-//        }
-
-
         Tasks:
         1. Upon receiving a packet and recipient, call deliverPacket(packet)
         2. If the packet contains "SHOW_ROUTE" request, then fetch the required information
@@ -38,30 +27,23 @@ public class ServerThread implements Runnable {
         */
         networkUtility.write(endDevice); /// sending endDevice configuration
 
-        String msg = (String) networkUtility.read();
-        if(msg == null || !msg.equals(Constants.SEND_ACTIVE_CLIENT))
+        Packet packet = (Packet) networkUtility.read();
+        if(packet == null || !packet.getSpecialMessage().equals(Constants.SEND_ACTIVE_CLIENT)){
+            freeClientResourse();
             return;
+        }
 
         HashSet<IPAddress> activeClientIPs = getActiveClientIPs();
         networkUtility.write(activeClientIPs);
 
-        for(int i=0;i<100;i++) {
-//            if(activeClientIPs.size() <= 1){
-//                try {
-//                    Thread.sleep(5000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                System.out.println("Sending packet again");
-//                continue;
-//            }
+        for(int i=0;i<Constants.NO_OF_EXP;i++) {
             Object obj = networkUtility.read();
             if(obj == null) {
                 freeClientResourse();
                 return;
             }
 
-            Packet packet = (Packet) obj;
+            packet = (Packet) obj;
 
             if (!deliverPacket(packet)) {
                 packet.hopcount = Constants.INFINITY;
@@ -74,27 +56,35 @@ public class ServerThread implements Runnable {
             packet.setMessage("acknowledgement");
 
             if(packet.getSpecialMessage().equals(Constants.SHOW_ROUTE)) {
-                System.out.println("**************Sending route to : " + endDevice.getDeviceID());
-                if (route != null || route.size() != 0) {
-                    System.out.println("Route length " + route.size());
-                    System.out.println("Route");
-                    for (Router r: route) {
-                        System.out.print(r.getRouterId() + " -> ");
-                    }
-                    System.out.println();
-                }
-                else
-                    System.out.println("No route finds");
+                //System.out.println("**************Sending route to : " + endDevice.getDeviceID());
+//                if (route != null || route.size() != 0) {
+//                    System.out.println("Route length " + route.size());
+//                    System.out.println("Route");
+//                    for (Router r: route) {
+//                        System.out.print(r.getRouterId() + " -> ");
+//                    }
+//                    System.out.println();
+//                }
+//                else
+//                    System.out.println("No route finds");
 
                 networkUtility.write(getRoutePath());
-                if(Constants.REQUEST_ROUTING_TABLE.equals(networkUtility.read()))
-                    networkUtility.write(getRouteTables());
+                Object obj2 = networkUtility.read();
+                if(obj2 instanceof Packet) {
+                    //System.out.println("request " + ((Packet)obj2).getSpecialMessage());
+                    if(Constants.REQUEST_ROUTING_TABLE.equals(((Packet)obj2).getSpecialMessage())) {
+                        networkUtility.write(getRouteTables());
+                        System.out.println("Send routing table of all router.");
+                    }
+                }
+
             }
             else
                 networkUtility.write(packet);
         }
 
         freeClientResourse(); /// Deleting this client from every list and updating client
+        networkUtility.closeConnection();
     }
 
     private Vector<Integer> getRoutePath(){
@@ -120,7 +110,6 @@ public class ServerThread implements Runnable {
         NetworkLayerServer.endDevices.remove(endDevice);
         NetworkLayerServer.endDeviceMap.remove(endDevice.getIpAddress());
     }
-
 
     public Boolean deliverPacket(Packet p) {
         /// 1. Find the router s which has an interface
@@ -170,16 +159,24 @@ public class ServerThread implements Runnable {
                 routingEntry.setDistance(Constants.INFINITY);
                 routingEntry.setGatewayRouterId(-1);
                 RouterStateChanger.islocked = true;
-                NetworkLayerServer.simpleDVR(sourceRouter.getRouterId());
+                NetworkLayerServer.DVR(sourceRouter.getRouterId());
                 RouterStateChanger.islocked = false;
-                return false;
+                try {
+                    RouterStateChanger.msg.notify();
+                }catch (Exception ex){}
+                finally {
+                    return false;
+                }
             }
             else if (nextRouter.getRoutingEntryForRouterID(sourceRouter.getRouterId()).getDistance() == Constants.INFINITY){
                 nextRouter.getRoutingEntryForRouterID(sourceRouter.getRouterId()).setDistance(1);
                 nextRouter.getRoutingEntryForRouterID(sourceRouter.getRouterId()).setGatewayRouterId(sourceRouter.getRouterId());
                 RouterStateChanger.islocked = true;
-                NetworkLayerServer.simpleDVR(nextRouter.getRouterId());
+                NetworkLayerServer.DVR(nextRouter.getRouterId());
                 RouterStateChanger.islocked = false;
+                try {
+                    RouterStateChanger.msg.notify();
+                }catch (Exception ex){}
             }
             sourceRouter = nextRouter;
             route.add(sourceRouter);
